@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+    --color-background: #f8f9fa;
+    --color-foreground: #191c1d;
+
+    --color-primary: #630ed4;
+    --color-primary-foreground: #ffffff;
+
+    --color-secondary: #b4136d;
+    --color-secondary-foreground: #ffffff;
+
+    --color-muted: #f3f4f5;
+    --color-muted-foreground: #4a4455;
+
+    --color-accent: #b4136d;
+    --color-accent-foreground: #ffffff;
+
+    --color-border: transparent;
+    /* Strictly enforce No-Line Rule */
+    --color-input: #f3f4f5;
+    --color-ring: #630ed4;
+
+    /* Tonal Layering Scale */
+    --color-surface: #f8f9fa;
+    --color-surface-container-low: #f3f4f5;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-high: #e7e8e9;
+    --color-surface-container-highest: #e1e3e4;
+
+    --radius-lg: 1.5rem;
+    --radius-md: 0.75rem;
+    --radius-sm: 0.5rem;
+    --radius-xl: 2.5rem;
+
+    --font-body: var(--font-body);
+    --font-display: var(--font-display);
+}
+
+@layer base {
+    * {
+        border-color: transparent !important;
+        /* Force removal of all borders for No-Line rule */
+    }
+
+    body {
+        @apply bg-surface text-foreground font-body antialiased selection:bg-primary/20;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        @apply font-display tracking-tight leading-[1.1];
+    }
+}
+
+@layer utilities {
+    .shadow-ambient {
+        box-shadow: 0 24px 48px -12px rgba(25, 28, 29, 0.06);
+    }
+
+    .shadow-raised {
+        box-shadow: 0 32px 64px -16px rgba(99, 14, 212, 0.1);
+    }
+
+    .glass-morphism {
+        @apply bg-surface/70 backdrop-blur-xl;
+    }
+
+    .custom-scrollbar {
+        &::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background-color: transparent;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            @apply bg-surface-container-high rounded-full hover:bg-muted-foreground/30 transition-colors;
+        }
+    }
+}
+
+/* Calendar styling overrides */
+.rdp {
+    --rdp-cell-size: 40px;
+    --rdp-accent-color: var(--color-primary);
+    --rdp-background-color: rgba(99, 14, 212, 0.1);
+    margin: 0;
+}

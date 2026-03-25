@@ -1,0 +1,362 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { format } from "date-fns";
+import { useRecommendations, useGenerateEvent, useMarketingContent } from "@/hooks/use-events";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ProductCard } from "@/components/product/ProductCard";
+import { Button } from "@/components/ui/button";
+import {
+    Loader2, Sparkles, MapPin, Calendar as CalendarIcon,
+    Shirt, Megaphone, Gift, ChevronLeft, ChevronRight,
+    Smartphone, Share2
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import type { Event } from "@shared/schema";
+import { cn } from "@/lib/utils";
+
+interface EventDialogProps {
+    dateStr: string | null;
+    events: Event[];
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+type ModalTab = "outfit" | "marketing" | "gifting";
+
+function AestheticPills({ event }: { event: Event }) {
+    const pills: string[] = [];
+    if (event.fashionKeywords?.mood?.length) pills.push(...event.fashionKeywords.mood);
+    if (event.fashionKeywords?.styles?.length) pills.push(...event.fashionKeywords.styles);
+    if (event.fashionKeywords?.colors?.length) pills.push(...event.fashionKeywords.colors);
+
+    const uniquePills = Array.from(new Set(pills));
+    if (!uniquePills.length) return null;
+
+    return (
+        <div className="mt-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-3">
+                Fashion Aesthetics
+            </p>
+            <div className="flex flex-wrap gap-2">
+                {uniquePills.map((p, i) => (
+                    <span
+                        key={i}
+                        className="px-4 py-1.5 rounded-full bg-surface-container-high text-primary text-[11px] font-bold tracking-tight"
+                    >
+                        {p}
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function EventSwitcher({
+    events, activeIndex, onSelect,
+}: {
+    events: Event[];
+    activeIndex: number;
+    onSelect: (i: number) => void;
+}) {
+    if (events.length <= 1) return null;
+
+    return (
+        <div className="flex items-center gap-2 bg-surface-container-low rounded-full px-2 py-2">
+            <button
+                onClick={() => onSelect(Math.max(0, activeIndex - 1))}
+                disabled={activeIndex === 0}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white disabled:opacity-30 transition-all shadow-sm"
+            >
+                <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {events.map((_, i) => (
+                <button
+                    key={i}
+                    onClick={() => onSelect(i)}
+                    className={`w-8 h-8 rounded-full text-[12px] font-bold transition-all ${i === activeIndex
+                        ? "bg-primary text-white shadow-raised scale-110"
+                        : "text-muted-foreground hover:text-foreground"
+                        }`}
+                >
+                    {i + 1}
+                </button>
+            ))}
+
+            <button
+                onClick={() => onSelect(Math.min(events.length - 1, activeIndex + 1))}
+                disabled={activeIndex === events.length - 1}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white disabled:opacity-30 transition-all shadow-sm"
+            >
+                <ChevronRight className="w-4 h-4" />
+            </button>
+        </div>
+    );
+}
+
+function OutfitTab({ event, dateStr }: { event: Event; dateStr: string }) {
+    const [vibe, setVibe] = useState("all");
+    const { data: recs, isLoading } = useRecommendations(dateStr, vibe, event.id);
+
+    return (
+        <div className="space-y-8">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+                <h4 className="font-display font-bold text-2xl italic">Curated Silhouettes</h4>
+                <div className="flex gap-1 bg-surface-container-low rounded-full p-1">
+                    {["all", "party", "casual", "festive"].map(t => (
+                        <button
+                            key={t}
+                            onClick={() => setVibe(t)}
+                            className={`px-5 py-2 rounded-full text-[10px] font-bold tracking-widest uppercase transition-all ${vibe === t
+                                ? "bg-primary text-white shadow-raised"
+                                : "text-muted-foreground hover:text-foreground"
+                                }`}
+                        >
+                            {t}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {isLoading ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <AnimatePresence mode="popLayout">
+                        {(recs ?? []).map((p: any, idx: number) => (
+                            <motion.div
+                                key={p.id}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: idx * 0.05 }}
+                            >
+                                <ProductCard product={p} />
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                    {!(recs ?? []).length && (
+                        <div className="col-span-2 py-20 text-center text-muted-foreground font-display italic text-lg">
+                            No silhouette matches for this event yet.
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function MktCard({ icon: Icon, title, children }: {
+    icon: React.ComponentType<{ className?: string }>;
+    title: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="bg-white rounded-[2.5rem] p-10 flex flex-col gap-8 shadow-ambient border-none">
+            <div className="flex items-center gap-6">
+                <div className="w-14 h-14 rounded-[1.25rem] bg-surface-container-low flex items-center justify-center">
+                    <Icon className="w-7 h-7 text-primary" />
+                </div>
+                <h4 className="font-display font-bold text-2xl tracking-tight">{title}</h4>
+            </div>
+            <div className="space-y-6">
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function MarketingTab({ event }: { event: Event }) {
+    const { data: mkt, isLoading } = useMarketingContent(event.id);
+    if (isLoading) return (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
+            <p className="text-[10px] uppercase tracking-[0.3em] font-bold text-primary animate-pulse">Generating Campaign...</p>
+        </div>
+    );
+
+    const appHeadline = mkt?.app?.headline ?? `${event.name} — Dress the Moment`;
+    const appSubtext = mkt?.app?.subtext ?? "Shop curated fashion looks.";
+
+    return (
+        <div className="grid lg:grid-cols-2 gap-8">
+            <MktCard icon={Smartphone} title="In-App Editorial">
+                <div className="space-y-6">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-2">Headline</p>
+                        <p className="text-xl font-display font-bold italic">{appHeadline}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-2">Subtext</p>
+                        <p className="text-muted-foreground font-body leading-relaxed">{appSubtext}</p>
+                    </div>
+                    <div className="pt-4">
+                        <span className="px-6 py-2.5 rounded-full bg-primary text-white text-[10px] font-bold tracking-widest uppercase">
+                            CTA: {mkt?.app?.cta ?? "Shop Now"}
+                        </span>
+                    </div>
+                </div>
+            </MktCard>
+
+            <MktCard icon={Share2} title="Social Narrative">
+                <div className="space-y-6">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-2">Caption</p>
+                        <p className="text-muted-foreground font-body leading-relaxed italic">"{mkt?.social?.caption}"</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground/40 mb-2">Keywords</p>
+                        <div className="flex flex-wrap gap-2">
+                            {(mkt?.social?.hashtags ?? []).map((tag: string, i: number) => (
+                                <span key={i} className="text-[10px] font-bold text-primary bg-primary/5 px-3 py-1 rounded-full">
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </MktCard>
+        </div>
+    );
+}
+
+function GiftingTab({ event }: { event: Event }) {
+    return (
+        <div className="bg-surface-container-low rounded-[3rem] p-12">
+            <div className="flex items-center gap-4 mb-8">
+                <Gift className="w-8 h-8 text-secondary" />
+                <h4 className="font-display font-bold text-4xl italic">Gifting Curation</h4>
+            </div>
+            <div className="grid md:grid-cols-2 gap-8">
+                {[
+                    { title: "Signature Sets", desc: "Curated hues for the occasion." },
+                    { title: "Mood matched", desc: "Accessories evoking the spirit." },
+                ].map((item, i) => (
+                    <div key={i} className="bg-white rounded-[2rem] p-8 shadow-ambient">
+                        <p className="font-display font-bold text-xl mb-2">{item.title}</p>
+                        <p className="text-muted-foreground text-sm font-body">{item.desc}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export function EventDialog({ dateStr, events, isOpen, onClose }: EventDialogProps) {
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [activeTab, setActiveTab] = useState<ModalTab>("outfit");
+    const generateEvent = useGenerateEvent();
+
+    useEffect(() => {
+        setActiveIndex(0);
+        setActiveTab("outfit");
+    }, [dateStr, isOpen]);
+
+    const event: Event | undefined = events[activeIndex];
+    const hasGifting = !!(event?.intents?.includes("gifting"));
+
+    const tabs = [
+        { id: "outfit" as ModalTab, label: "Outfit", icon: Shirt },
+        { id: "marketing" as ModalTab, label: "Campaign", icon: Megaphone },
+        ...(hasGifting ? [{ id: "gifting" as ModalTab, label: "Gifting", icon: Gift }] : []),
+    ];
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto border-none glass-morphism p-0 rounded-[4rem]">
+                {!events.length ? (
+                    <div className="text-center py-32 space-y-8">
+                        <h3 className="text-5xl font-display font-bold italic">No events found.</h3>
+                        <p className="text-muted-foreground text-xl font-body">Ready to curate a moment?</p>
+                        <Button
+                            onClick={() => dateStr && generateEvent.mutate(dateStr as any)}
+                            disabled={generateEvent.isPending}
+                            className="rounded-full px-12 py-8 bg-primary text-white font-bold text-lg shadow-raised"
+                        >
+                            <Sparkles className="w-6 h-6 mr-3" />
+                            Generate Custom Plan
+                        </Button>
+                    </div>
+                ) : !event ? null : (
+                    <div className="p-12 space-y-12">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-8">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-3 text-primary mb-6">
+                                    <CalendarIcon className="w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.4em]">
+                                        {dateStr ? format(new Date(dateStr + "T00:00:00"), "EEEE, MMMM do") : ""}
+                                    </span>
+                                </div>
+
+                                <DialogTitle className="text-6xl md:text-7xl font-display font-bold tracking-tight mb-4 leading-[0.9]">
+                                    {event.name}
+                                </DialogTitle>
+
+                                <div className="flex items-center gap-3 text-muted-foreground/40 mb-8 font-bold text-[10px] uppercase tracking-widest">
+                                    <MapPin className="w-4 h-4" />
+                                    <span>Global Edit / Bengaluru</span>
+                                </div>
+
+                                <AestheticPills event={event} />
+                            </div>
+
+                            <div className="flex flex-col items-end gap-6">
+                                <span className="px-5 py-2 rounded-full bg-primary/10 text-primary text-[10px] font-bold border-none uppercase tracking-widest">
+                                    AI Curated
+                                </span>
+                                <EventSwitcher
+                                    events={events}
+                                    activeIndex={activeIndex}
+                                    onSelect={(i) => { setActiveIndex(i); setActiveTab("outfit"); }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        {event.description && (
+                            <div className="bg-surface-container-high/40 p-8 rounded-[2.5rem] italic font-display text-2xl text-foreground/80 leading-relaxed shadow-sm">
+                                "{event.description}"
+                            </div>
+                        )}
+
+                        {/* Tabs */}
+                        <div className="space-y-10">
+                            <div className="flex gap-2 bg-surface-container-low p-2 rounded-full w-fit">
+                                {tabs.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center gap-3 px-8 py-3 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase transition-all ${activeTab === tab.id
+                                            ? "bg-primary text-white shadow-raised"
+                                            : "text-muted-foreground hover:text-foreground"
+                                            }`}
+                                    >
+                                        <tab.icon className="w-4 h-4" />
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={`${activeTab}-${event.id}`}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    transition={{ duration: 0.5, ease: "circOut" }}
+                                >
+                                    {activeTab === "outfit" && <OutfitTab event={event} dateStr={dateStr ?? ""} />}
+                                    {activeTab === "marketing" && <MarketingTab event={event} />}
+                                    {activeTab === "gifting" && <GiftingTab event={event} />}
+                                </motion.div>
+                            </AnimatePresence>
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
